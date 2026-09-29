@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BowlMath - calculator</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #131018; color: #f2edf6; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+  main { max-width: 760px; padding: 32px 20px 48px; width: 100%; box-sizing: border-box; }
+  h1 { font-size: 1.9rem; margin: 0 0 4px; }
+  p.sub { color: #cfc4da; margin: 0 0 20px; }
+  .card { background: #1a1622; border: 1px solid #322944; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
+  .card h2 { margin: 0 0 12px; font-size: 1.05rem; color: #ddd2ee; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
+  label { display: block; color: #b8abc7; font-size: 0.82rem; margin-bottom: 4px; }
+  input, select { width: 100%; box-sizing: border-box; background: #131018; border: 1px solid #3d3352; color: #f2edf6; border-radius: 8px; padding: 9px 10px; font-size: 0.95rem; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .presets button { background: #241d33; color: #e4dcf0; border: 1px solid #3d3352; border-radius: 999px; padding: 7px 14px; font-size: 0.85rem; cursor: pointer; }
+  .presets button:hover { background: #322944; }
+  .out { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .metric { background: #131018; border: 1px solid #322944; border-radius: 10px; padding: 12px 14px; }
+  .metric .v { font-size: 1.3rem; font-weight: 700; color: #b79df2; }
+  .metric .k { color: #b8abc7; font-size: 0.78rem; margin-top: 2px; }
+  .note { color: #978ba8; font-size: 0.82rem; line-height: 1.5; margin-top: 10px; }
+  .frames { font-family: ui-monospace, monospace; font-size: 0.85rem; color: #b79df2; margin-top: 10px; word-break: break-all; }
+  a.back { color: #b79df2; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>&#127923; BowlMath</h1>
+  <p class="sub">Paste the frames; get the truth.</p>
+  <div class="presets">
+    <button data-p="classic">The classic 181</button>
+    <button data-p="perfect">Perfect game</button>
+    <button data-p="heartbreak">299 heartbreak</button>
+    <button data-p="league">League night</button>
+  </div>
+  <div class="card">
+    <h2>1. Score a game</h2>
+    <label>Frames, space-separated (X = strike, / = spare, - = gutter). Partial games welcome - ball-by-ball works too.</label>
+    <input id="game" type="text" value="X 7/ 9- X -8 8/ 9- X X X9/" style="font-family:ui-monospace,monospace">
+    <div class="out" style="margin-top:12px">
+      <div class="metric"><div class="v" id="o-total">-</div><div class="k">Score so far</div></div>
+      <div class="metric"><div class="v" id="o-max">-</div><div class="k">Best still possible</div></div>
+      <div class="metric"><div class="v" id="o-marks">-</div><div class="k">Strikes / spares / opens</div></div>
+      <div class="metric"><div class="v" id="o-frames">-</div><div class="k">Frames scored</div></div>
+    </div>
+    <div class="frames" id="o-grid"></div>
+  </div>
+  <div class="card">
+    <h2>2. League numbers</h2>
+    <div class="grid">
+      <div><label>Your average</label><input id="avg" type="number" value="165" min="30" max="280"></div>
+      <div><label>Tonight's games (comma-separated)</label><input id="series" type="text" value="178, 195, 162"></div>
+    </div>
+    <div class="out" style="margin-top:12px">
+      <div class="metric"><div class="v" id="o-hcp">-</div><div class="k">Handicap per game (90% of 220)</div></div>
+      <div class="metric"><div class="v" id="o-series">-</div><div class="k">Series scratch / with handicap</div></div>
+      <div class="metric"><div class="v" id="o-band">-</div><div class="k">Honest level band</div></div>
+    </div>
+    <p class="note" id="o-note"></p>
+  </div>
+  <p class="note">Scoring rules: a strike adds the next two balls, a spare adds the next one, and the 10th frame holds up to three balls. The max-possible number assumes every ball you have left finds the pocket.</p>
+  <p><a class="back" href="index.html">&larr; Back to BowlMath</a></p>
+</main>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var ids = ['game','avg','series'];
+  function num(id) { var v = parseFloat(document.getElementById(id).value); return isFinite(v) ? v : 0; }
+  function compute() {
+    if (typeof BowlMath === 'undefined') return;
+    var g = BowlMath.scoreGame(document.getElementById('game').value);
+    if (!g) {
+      document.getElementById('o-total').textContent = 'unreadable';
+      document.getElementById('o-max').textContent = '-';
+      document.getElementById('o-marks').textContent = '-';
+      document.getElementById('o-frames').textContent = '-';
+      document.getElementById('o-grid').textContent = '';
+    } else {
+      document.getElementById('o-total').textContent = g.total + (g.complete ? '' : '+');
+      var mx = BowlMath.maxPossible(document.getElementById('game').value);
+      document.getElementById('o-max').textContent = g.complete ? 'final: ' + g.total : mx;
+      document.getElementById('o-marks').textContent = g.strikes + ' / ' + g.spares + ' / ' + g.opens;
+      document.getElementById('o-frames').textContent = g.frames.length + (g.complete ? ' (complete)' : ' so far');
+      document.getElementById('o-grid').textContent = g.frames.map(function (f) {
+        return 'F' + f.frame + ':' + (f.value === null ? '...' : f.value);
+      }).join('  ');
+    }
+    var avg = num('avg');
+    var hcp = BowlMath.handicap(avg);
+    document.getElementById('o-hcp').textContent = hcp + ' pins';
+    var games = document.getElementById('series').value.split(',').map(function (s) { return parseFloat(s.trim()); }).filter(function (v) { return isFinite(v); });
+    if (games.length) {
+      var s = BowlMath.seriesWithHandicap(games, hcp);
+      document.getElementById('o-series').textContent = s.scratch + ' / ' + s.withHandicap;
+    } else {
+      document.getElementById('o-series').textContent = '-';
+    }
+    document.getElementById('o-band').textContent = BowlMath.avgBand(avg);
+    document.getElementById('o-note').textContent = g && g.complete
+      ? 'Full game: ' + g.total + (g.total === 300 ? ' - twelve strikes, nothing to discuss.' : g.total >= 200 ? ' - a 200 game. Buy the round.' : '.')
+      : 'Game still live. Every remaining ball as a strike tops out at ' + (g ? BowlMath.maxPossible(document.getElementById('game').value) : '?') + '.';
+  }
+  var presets = {
+    classic: {game:'X 7/ 9- X -8 8/ 9- X X X9/', avg:165, series:'178, 195, 162'},
+    perfect: {game:'X X X X X X X X X X X X', avg:225, series:'300, 268, 245'},
+    heartbreak: {game:'X X X X X X X X X X X 9', avg:210, series:'299, 223, 237'},
+    league: {game:'X 7/ 9- X -8', avg:152, series:'166, 171, 158'}
+  };
+  Array.prototype.forEach.call(document.querySelectorAll('.presets button'), function (b) {
+    b.addEventListener('click', function () {
+      var p = presets[b.getAttribute('data-p')];
+      if (!p) return;
+      Object.keys(p).forEach(function (k) { document.getElementById(k).value = p[k]; });
+      compute();
+    });
+  });
+  ids.forEach(function (id) {
+    document.getElementById(id).addEventListener('input', compute);
+    document.getElementById(id).addEventListener('change', compute);
+  });
+  compute();
+})();
+</script>
+</body>
+</html>
